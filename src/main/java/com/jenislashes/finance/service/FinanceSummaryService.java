@@ -1,6 +1,8 @@
 package com.jenislashes.finance.service;
 
 import com.jenislashes.common.exception.BadRequestException;
+import com.jenislashes.finance.dto.CategoryBreakdownResponse;
+import com.jenislashes.finance.dto.CategoryEntry;
 import com.jenislashes.finance.dto.DailyFinanceEntry;
 import com.jenislashes.finance.dto.ExpenseResponse;
 import com.jenislashes.finance.dto.FinanceHistoryMonthResponse;
@@ -118,6 +120,30 @@ public class FinanceSummaryService {
                 recordedExpenses,
                 completedIncome.subtract(recordedExpenses)
         );
+    }
+
+    public CategoryBreakdownResponse getCategoryBreakdown(LocalDate from, LocalDate to) {
+        if (from.isAfter(to)) {
+            throw new BadRequestException("From date must be before or equal to to date");
+        }
+
+        OffsetDateTime incomeFrom = from.atStartOfDay(DEFAULT_ZONE).toOffsetDateTime().withOffsetSameInstant(ZoneOffset.UTC);
+        OffsetDateTime incomeTo = to.plusDays(1).atStartOfDay(DEFAULT_ZONE).toOffsetDateTime().withOffsetSameInstant(ZoneOffset.UTC);
+
+        List<CategoryEntry> incomeBreakdown = financeSummaryRepository.incomeBreakdownByServiceCategory(incomeFrom, incomeTo);
+
+        List<ExpenseRecord> expenseRecords = expenseRepository.findBetween(from, to);
+        List<CategoryEntry> expenseBreakdown = expenseRecords.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        e -> e.expenseCategoryName() != null ? e.expenseCategoryName() : "Sin categoria",
+                        java.util.stream.Collectors.reducing(BigDecimal.ZERO, ExpenseRecord::amount, BigDecimal::add)
+                ))
+                .entrySet().stream()
+                .map(e -> new CategoryEntry(e.getKey(), e.getValue()))
+                .sorted((a, b) -> b.amount().compareTo(a.amount()))
+                .toList();
+
+        return new CategoryBreakdownResponse(incomeBreakdown, expenseBreakdown);
     }
 
     public FinanceHistoryResponse getFinanceHistory(int months) {

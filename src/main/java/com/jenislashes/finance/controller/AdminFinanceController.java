@@ -1,5 +1,6 @@
 package com.jenislashes.finance.controller;
 
+import com.jenislashes.finance.dto.CategoryBreakdownResponse;
 import com.jenislashes.finance.dto.FinanceHistoryResponse;
 import com.jenislashes.finance.dto.MonthlyFinanceSummaryResponse;
 import com.jenislashes.finance.dto.RangeFinanceResponse;
@@ -42,5 +43,13 @@ public class AdminFinanceController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
         return ResponseEntity.ok(financeSummaryService.getRangeSummary(from, to));
+    }
+
+    @GetMapping("/category-breakdown")
+    public ResponseEntity<CategoryBreakdownResponse> categoryBreakdown(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return ResponseEntity.ok(financeSummaryService.getCategoryBreakdown(from, to));
     }
 }

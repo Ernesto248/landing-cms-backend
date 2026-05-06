@@ -1,5 +1,6 @@
 package com.jenislashes.finance.repository;
 
+import com.jenislashes.finance.dto.CategoryEntry;
 import com.jenislashes.finance.dto.DailyFinanceEntry;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -52,6 +53,30 @@ public class FinanceSummaryRepository {
                   and a.completed_at < ?
                 group by (a.completed_at at time zone 'America/Havana')::date
                 order by day asc
+                """,
+                mapper,
+                from,
+                toExclusive
+        );
+    }
+
+    public List<CategoryEntry> incomeBreakdownByServiceCategory(OffsetDateTime from, OffsetDateTime toExclusive) {
+        RowMapper<CategoryEntry> mapper = (rs, rowNum) -> new CategoryEntry(
+                rs.getString("category"),
+                rs.getBigDecimal("amount")
+        );
+
+        return jdbcTemplate.query(
+                """
+                select s.category, coalesce(sum(ai.final_price), 0) as amount
+                from appointment_items ai
+                join appointments a on a.id = ai.appointment_id
+                join services s on s.id = ai.service_id
+                where a.status = 'COMPLETED'
+                  and a.completed_at >= ?
+                  and a.completed_at < ?
+                group by s.category
+                order by amount desc
                 """,
                 mapper,
                 from,
