@@ -42,10 +42,11 @@ public class AdminGalleryController {
             @RequestParam(required = false) String altText,
             @RequestParam(required = false) String caption,
             @RequestParam(required = false) Integer sortOrder,
-            @RequestParam(required = false) Boolean isActive
+            @RequestParam(required = false) Boolean isActive,
+            @RequestParam(required = false) UUID serviceId
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(galleryService.upload(file, altText, caption, sortOrder, isActive));
+                .body(galleryService.upload(file, altText, caption, sortOrder, isActive, serviceId));
     }
 
     @PutMapping("/{galleryItemId}")

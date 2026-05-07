@@ -108,4 +108,13 @@ class ExpenseServiceTest {
                 () -> assertNull(response.expenseCategoryId())
         );
     }
+
+    @Test
+    void deleteExpense_should_call_repository_delete() {
+        UUID expenseId = UUID.randomUUID();
+
+        expenseService.deleteExpense(expenseId);
+
+        verify(expenseRepository).deleteById(expenseId);
+    }
 }

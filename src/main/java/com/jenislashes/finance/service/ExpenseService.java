@@ -1,6 +1,7 @@
 package com.jenislashes.finance.service;
 
 import com.jenislashes.common.exception.BadRequestException;
+import com.jenislashes.common.exception.NotFoundException;
 import com.jenislashes.finance.dto.CreateExpenseRequest;
 import com.jenislashes.finance.dto.ExpenseResponse;
 import com.jenislashes.finance.model.ExpenseCategoryRecord;
@@ -73,5 +74,10 @@ public class ExpenseService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    @Transactional
+    public void deleteExpense(UUID expenseId) {
+        expenseRepository.deleteById(expenseId);
     }
 }

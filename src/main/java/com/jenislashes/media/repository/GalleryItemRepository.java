@@ -22,8 +22,20 @@ public class GalleryItemRepository {
             rs.getString("caption"),
             rs.getInt("sort_order"),
             rs.getBoolean("is_active"),
+            rs.getObject("service_id", UUID.class),
+            rs.getString("service_name"),
+            rs.getString("service_category"),
             rs.getObject("created_at", OffsetDateTime.class)
     );
+
+    private static final String SELECT_JOIN = """
+            select gi.id, gi.file_key, gi.public_url, gi.alt_text, gi.caption,
+                   gi.sort_order, gi.is_active, gi.service_id,
+                   s.name as service_name, s.category as service_category,
+                   gi.created_at
+            from gallery_items gi
+            left join services s on s.id = gi.service_id
+            """;
 
     public GalleryItemRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -31,21 +43,21 @@ public class GalleryItemRepository {
 
     public List<GalleryItemRecord> findAll() {
         return jdbcTemplate.query(
-                "select id, file_key, public_url, alt_text, caption, sort_order, is_active, created_at from gallery_items order by sort_order asc, created_at desc",
+                SELECT_JOIN + " order by gi.sort_order asc, gi.created_at desc",
                 rowMapper
         );
     }
 
     public List<GalleryItemRecord> findPublic() {
         return jdbcTemplate.query(
-                "select id, file_key, public_url, alt_text, caption, sort_order, is_active, created_at from gallery_items where is_active = true order by sort_order asc, created_at desc",
+                SELECT_JOIN + " where gi.is_active = true and gi.service_id is not null order by gi.sort_order asc, gi.created_at desc",
                 rowMapper
         );
     }
 
     public Optional<GalleryItemRecord> findById(UUID galleryItemId) {
         return jdbcTemplate.query(
-                "select id, file_key, public_url, alt_text, caption, sort_order, is_active, created_at from gallery_items where id = ? limit 1",
+                SELECT_JOIN + " where gi.id = ? limit 1",
                 rowMapper,
                 galleryItemId
         ).stream().findFirst();
@@ -53,7 +65,7 @@ public class GalleryItemRepository {
 
     public void insert(GalleryItemRecord record) {
         jdbcTemplate.update(
-                "insert into gallery_items (id, file_key, public_url, alt_text, caption, sort_order, is_active, created_at) values (?, ?, ?, ?, ?, ?, ?, ?)",
+                "insert into gallery_items (id, file_key, public_url, alt_text, caption, sort_order, is_active, service_id, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 record.id(),
                 record.fileKey(),
                 record.publicUrl(),
@@ -61,17 +73,19 @@ public class GalleryItemRepository {
                 record.caption(),
                 record.sortOrder(),
                 record.isActive(),
+                record.serviceId(),
                 record.createdAt()
         );
     }
 
     public void update(GalleryItemRecord record) {
         jdbcTemplate.update(
-                "update gallery_items set alt_text = ?, caption = ?, sort_order = ?, is_active = ? where id = ?",
+                "update gallery_items set alt_text = ?, caption = ?, sort_order = ?, is_active = ?, service_id = ? where id = ?",
                 record.altText(),
                 record.caption(),
                 record.sortOrder(),
                 record.isActive(),
+                record.serviceId(),
                 record.id()
         );
     }

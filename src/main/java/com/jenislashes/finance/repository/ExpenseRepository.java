@@ -71,4 +71,15 @@ public class ExpenseRepository {
         );
         return total == null ? BigDecimal.ZERO : total;
     }
+
+    public void deleteById(UUID expenseId) {
+        jdbcTemplate.update("delete from expenses where id = ?", expenseId);
+    }
+
+    public void nullifyCategoryId(UUID categoryId) {
+        jdbcTemplate.update(
+                "update expenses set expense_category_id = null where expense_category_id = ?",
+                categoryId
+        );
+    }
 }

@@ -1,6 +1,7 @@
 package com.jenislashes.finance.service;
 
 import com.jenislashes.common.exception.BadRequestException;
+import com.jenislashes.finance.dto.CategoryEntry;
 import com.jenislashes.finance.dto.DailyFinanceEntry;
 import com.jenislashes.finance.dto.FinanceHistoryResponse;
 import com.jenislashes.finance.dto.MonthlyFinanceSummaryResponse;
@@ -158,6 +159,75 @@ class FinanceSummaryServiceTest {
     @Test
     void getRangeSummary_should_reject_invalid_range() {
         assertThrows(BadRequestException.class, () -> financeSummaryService.getRangeSummary(
+                LocalDate.of(2026, 5, 10),
+                LocalDate.of(2026, 5, 1)
+        ));
+    }
+
+    @Test
+    void getCategoryBreakdown_should_return_income_by_service_category() {
+        LocalDate from = LocalDate.of(2026, 5, 1);
+        LocalDate to = LocalDate.of(2026, 5, 3);
+
+        when(financeSummaryRepository.incomeBreakdownByServiceCategory(any(OffsetDateTime.class), any(OffsetDateTime.class)))
+                .thenReturn(List.of(
+                        new CategoryEntry("Lashes", new BigDecimal("6000.00")),
+                        new CategoryEntry("Brows", new BigDecimal("2400.00"))
+                ));
+        when(expenseRepository.findBetween(from, to)).thenReturn(List.of(
+                new ExpenseRecord(UUID.randomUUID(), UUID.randomUUID(), "Insumos",
+                        LocalDate.of(2026, 5, 2), "Productos", new BigDecimal("400.00"),
+                        null, OffsetDateTime.parse("2026-05-02T10:00:00Z")),
+                new ExpenseRecord(UUID.randomUUID(), UUID.randomUUID(), "Transporte",
+                        LocalDate.of(2026, 5, 3), "Taxi", new BigDecimal("200.00"),
+                        null, OffsetDateTime.parse("2026-05-03T11:00:00Z")),
+                new ExpenseRecord(UUID.randomUUID(), UUID.randomUUID(), "Insumos",
+                        LocalDate.of(2026, 5, 1), "Guantes", new BigDecimal("300.00"),
+                        null, OffsetDateTime.parse("2026-05-01T09:00:00Z"))
+        ));
+
+        var response = financeSummaryService.getCategoryBreakdown(from, to);
+
+        assertAll(
+                () -> assertEquals(2, response.incomeBreakdown().size()),
+                () -> assertEquals("Lashes", response.incomeBreakdown().get(0).category()),
+                () -> assertEquals(new BigDecimal("6000.00"), response.incomeBreakdown().get(0).amount()),
+                () -> assertEquals("Brows", response.incomeBreakdown().get(1).category()),
+                () -> assertEquals(new BigDecimal("2400.00"), response.incomeBreakdown().get(1).amount()),
+                () -> assertEquals(2, response.expenseBreakdown().size()),
+                () -> assertEquals("Insumos", response.expenseBreakdown().get(0).category()),
+                () -> assertEquals(new BigDecimal("700.00"), response.expenseBreakdown().get(0).amount()),
+                () -> assertEquals("Transporte", response.expenseBreakdown().get(1).category()),
+                () -> assertEquals(new BigDecimal("200.00"), response.expenseBreakdown().get(1).amount())
+        );
+    }
+
+    @Test
+    void getCategoryBreakdown_should_handle_null_expense_category() {
+        LocalDate from = LocalDate.of(2026, 5, 1);
+        LocalDate to = LocalDate.of(2026, 5, 1);
+
+        when(financeSummaryRepository.incomeBreakdownByServiceCategory(any(OffsetDateTime.class), any(OffsetDateTime.class)))
+                .thenReturn(List.of());
+        when(expenseRepository.findBetween(from, to)).thenReturn(List.of(
+                new ExpenseRecord(UUID.randomUUID(), null, null,
+                        LocalDate.of(2026, 5, 1), "Gasto sin categoria", new BigDecimal("150.00"),
+                        null, OffsetDateTime.parse("2026-05-01T10:00:00Z"))
+        ));
+
+        var response = financeSummaryService.getCategoryBreakdown(from, to);
+
+        assertAll(
+                () -> assertEquals(0, response.incomeBreakdown().size()),
+                () -> assertEquals(1, response.expenseBreakdown().size()),
+                () -> assertEquals("Sin categoria", response.expenseBreakdown().get(0).category()),
+                () -> assertEquals(new BigDecimal("150.00"), response.expenseBreakdown().get(0).amount())
+        );
+    }
+
+    @Test
+    void getCategoryBreakdown_should_reject_invalid_range() {
+        assertThrows(BadRequestException.class, () -> financeSummaryService.getCategoryBreakdown(
                 LocalDate.of(2026, 5, 10),
                 LocalDate.of(2026, 5, 1)
         ));

@@ -3,6 +3,8 @@ package com.jenislashes.finance.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.jenislashes.finance.dto.CategoryBreakdownResponse;
+import com.jenislashes.finance.dto.CategoryEntry;
 import com.jenislashes.finance.dto.DailyFinanceEntry;
 import com.jenislashes.finance.dto.FinanceHistoryMonthResponse;
 import com.jenislashes.finance.dto.FinanceHistoryResponse;
@@ -89,5 +91,35 @@ class AdminFinanceControllerTest {
                 .andExpect(jsonPath("$.days[0].date").value("2026-05-01"))
                 .andExpect(jsonPath("$.days[0].income").value(1500.00))
                 .andExpect(jsonPath("$.days[0].expenses").value(300.00));
+    }
+
+    @Test
+    void categoryBreakdown_should_return_breakdown_by_category() throws Exception {
+        when(financeSummaryService.getCategoryBreakdown(LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 10)))
+                .thenReturn(new CategoryBreakdownResponse(
+                        List.of(
+                                new CategoryEntry("Lashes", new BigDecimal("6000.00")),
+                                new CategoryEntry("Brows", new BigDecimal("2400.00"))
+                        ),
+                        List.of(
+                                new CategoryEntry("Insumos", new BigDecimal("700.00")),
+                                new CategoryEntry("Transporte", new BigDecimal("200.00"))
+                        )
+                ));
+
+        mockMvc.perform(get("/api/v1/admin/finance/category-breakdown")
+                        .queryParam("from", "2026-05-01")
+                        .queryParam("to", "2026-05-10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.incomeBreakdown.length()").value(2))
+                .andExpect(jsonPath("$.incomeBreakdown[0].category").value("Lashes"))
+                .andExpect(jsonPath("$.incomeBreakdown[0].amount").value(6000.00))
+                .andExpect(jsonPath("$.incomeBreakdown[1].category").value("Brows"))
+                .andExpect(jsonPath("$.incomeBreakdown[1].amount").value(2400.00))
+                .andExpect(jsonPath("$.expenseBreakdown.length()").value(2))
+                .andExpect(jsonPath("$.expenseBreakdown[0].category").value("Insumos"))
+                .andExpect(jsonPath("$.expenseBreakdown[0].amount").value(700.00))
+                .andExpect(jsonPath("$.expenseBreakdown[1].category").value("Transporte"))
+                .andExpect(jsonPath("$.expenseBreakdown[1].amount").value(200.00));
     }
 }

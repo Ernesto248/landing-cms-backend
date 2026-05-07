@@ -49,4 +49,16 @@ public class ExpenseCategoryRepository {
                 record.createdAt()
         );
     }
+
+    public void deleteById(UUID categoryId) {
+        jdbcTemplate.update("delete from expense_categories where id = ?", categoryId);
+    }
+
+    public Optional<ExpenseCategoryRecord> findByName(String name) {
+        return jdbcTemplate.query(
+                "select id, name, is_active, created_at from expense_categories where name = ? limit 1",
+                rowMapper,
+                name
+        ).stream().findFirst();
+    }
 }

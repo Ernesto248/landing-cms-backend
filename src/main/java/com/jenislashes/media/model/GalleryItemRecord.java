@@ -11,6 +11,9 @@ public record GalleryItemRecord(
         String caption,
         int sortOrder,
         boolean isActive,
+        UUID serviceId,
+        String serviceName,
+        String serviceCategory,
         OffsetDateTime createdAt
 ) {
 }

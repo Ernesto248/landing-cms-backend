@@ -5,6 +5,8 @@ import com.jenislashes.media.dto.GalleryItemResponse;
 import com.jenislashes.media.dto.UpdateGalleryItemRequest;
 import com.jenislashes.media.model.GalleryItemRecord;
 import com.jenislashes.media.repository.GalleryItemRepository;
+import com.jenislashes.servicecatalog.model.ServiceCatalogItem;
+import com.jenislashes.servicecatalog.repository.ServiceCatalogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,10 +21,16 @@ public class GalleryService {
 
     private final GalleryItemRepository galleryItemRepository;
     private final StorageService storageService;
+    private final ServiceCatalogRepository serviceCatalogRepository;
 
-    public GalleryService(GalleryItemRepository galleryItemRepository, StorageService storageService) {
+    public GalleryService(
+            GalleryItemRepository galleryItemRepository,
+            StorageService storageService,
+            ServiceCatalogRepository serviceCatalogRepository
+    ) {
         this.galleryItemRepository = galleryItemRepository;
         this.storageService = storageService;
+        this.serviceCatalogRepository = serviceCatalogRepository;
     }
 
     public List<GalleryItemResponse> listAdmin() {
@@ -34,8 +42,17 @@ public class GalleryService {
     }
 
     @Transactional
-    public GalleryItemResponse upload(MultipartFile file, String altText, String caption, Integer sortOrder, Boolean isActive) {
+    public GalleryItemResponse upload(MultipartFile file, String altText, String caption, Integer sortOrder, Boolean isActive, UUID serviceId) {
         StorageService.StoredFile storedFile = storageService.uploadGalleryImage(file);
+
+        String serviceName = null;
+        String serviceCategory = null;
+        if (serviceId != null) {
+            var svc = serviceCatalogRepository.findById(serviceId);
+            serviceName = svc.map(ServiceCatalogItem::name).orElse(null);
+            serviceCategory = svc.map(ServiceCatalogItem::category).orElse(null);
+        }
+
         GalleryItemRecord record = new GalleryItemRecord(
                 UUID.randomUUID(),
                 storedFile.fileKey(),
@@ -44,6 +61,9 @@ public class GalleryService {
                 normalizeNullable(caption),
                 sortOrder == null ? 0 : sortOrder,
                 isActive == null || isActive,
+                serviceId,
+                serviceName,
+                serviceCategory,
                 OffsetDateTime.now(ZoneOffset.UTC)
         );
         galleryItemRepository.insert(record);
@@ -55,6 +75,15 @@ public class GalleryService {
         GalleryItemRecord existing = galleryItemRepository.findById(galleryItemId)
                 .orElseThrow(() -> new NotFoundException("Gallery item not found"));
 
+        UUID serviceId = request.serviceId();
+        String serviceName = null;
+        String serviceCategory = null;
+        if (serviceId != null) {
+            var svc = serviceCatalogRepository.findById(serviceId);
+            serviceName = svc.map(ServiceCatalogItem::name).orElse(null);
+            serviceCategory = svc.map(ServiceCatalogItem::category).orElse(null);
+        }
+
         GalleryItemRecord updated = new GalleryItemRecord(
                 existing.id(),
                 existing.fileKey(),
@@ -63,6 +92,9 @@ public class GalleryService {
                 normalizeNullable(request.caption()),
                 request.sortOrder(),
                 request.isActive(),
+                serviceId,
+                serviceName,
+                serviceCategory,
                 existing.createdAt()
         );
 
@@ -88,6 +120,9 @@ public class GalleryService {
                 record.caption(),
                 record.sortOrder(),
                 record.isActive(),
+                record.serviceId(),
+                record.serviceName(),
+                record.serviceCategory(),
                 record.createdAt()
         );
     }
