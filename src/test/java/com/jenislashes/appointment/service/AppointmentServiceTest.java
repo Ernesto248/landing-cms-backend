@@ -6,6 +6,10 @@ import com.jenislashes.appointment.dto.UpdateAppointmentStatusRequest;
 import com.jenislashes.appointment.model.AppointmentItemRecord;
 import com.jenislashes.appointment.model.AppointmentRecord;
 import com.jenislashes.appointment.repository.AppointmentRepository;
+import com.jenislashes.business.model.BusinessHourRecord;
+import com.jenislashes.business.model.ScheduleBlockRecord;
+import com.jenislashes.business.repository.BusinessHoursRepository;
+import com.jenislashes.business.repository.ScheduleBlockRepository;
 import com.jenislashes.client.model.ClientRecord;
 import com.jenislashes.client.service.ClientService;
 import com.jenislashes.common.exception.BadRequestException;
@@ -21,7 +25,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,6 +56,12 @@ class AppointmentServiceTest {
 
     @Mock
     private ServiceCatalogRepository serviceCatalogRepository;
+
+    @Mock
+    private BusinessHoursRepository businessHoursRepository;
+
+    @Mock
+    private ScheduleBlockRepository scheduleBlockRepository;
 
     @InjectMocks
     private AppointmentService appointmentService;
@@ -87,6 +100,7 @@ class AppointmentServiceTest {
 
         when(clientService.requireClient(clientId)).thenReturn(client);
         when(serviceCatalogRepository.findById(serviceId)).thenReturn(Optional.of(service));
+        allowBusinessSchedule(start, start.plusMinutes(150), List.of());
         when(appointmentRepository.existsOverlap(any(), any(), eq(null))).thenReturn(false);
 
         var response = appointmentService.createAppointment(request);
@@ -135,6 +149,7 @@ class AppointmentServiceTest {
                 start,
                 start
         )));
+        allowBusinessSchedule(start, start.plusMinutes(15), List.of());
         when(appointmentRepository.existsOverlap(any(), any(), eq(null))).thenReturn(true);
 
         CreateAppointmentRequest request = new CreateAppointmentRequest(
@@ -265,6 +280,7 @@ class AppointmentServiceTest {
         when(appointmentRepository.findById(appointmentId)).thenReturn(Optional.of(existing));
         when(clientService.requireClient(nextClientId)).thenReturn(nextClient);
         when(serviceCatalogRepository.findById(serviceId)).thenReturn(Optional.of(service));
+        allowBusinessSchedule(start.plusDays(1), start.plusDays(1).plusMinutes(150), List.of());
         when(appointmentRepository.existsOverlap(any(), any(), eq(appointmentId))).thenReturn(false);
 
         CreateAppointmentRequest request = new CreateAppointmentRequest(
@@ -334,5 +350,130 @@ class AppointmentServiceTest {
 
         verify(appointmentRepository).deleteAppointment(appointmentId);
         verify(clientService).refreshAppointmentStats(clientId);
+    }
+
+    @Test
+    void createAppointment_should_reject_when_outside_business_hours() {
+        UUID clientId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        OffsetDateTime start = OffsetDateTime.parse("2026-05-10T22:00:00Z");
+
+        when(clientService.requireClient(clientId)).thenReturn(new ClientRecord(clientId, "Maria", null, null, null, null, 0, start, start));
+        when(serviceCatalogRepository.findById(serviceId)).thenReturn(Optional.of(activeService(serviceId, start, 60)));
+        when(businessHoursRepository.findByDayOfWeek((short) 7)).thenReturn(Optional.of(new BusinessHourRecord(
+                UUID.randomUUID(),
+                (short) 7,
+                LocalTime.of(9, 0),
+                LocalTime.of(17, 0),
+                false
+        )));
+
+        CreateAppointmentRequest request = new CreateAppointmentRequest(
+                clientId,
+                start,
+                List.of(new AppointmentItemRequest(serviceId, false)),
+                "STUDIO",
+                BigDecimal.ZERO,
+                null,
+                null
+        );
+
+        assertThrows(ConflictException.class, () -> appointmentService.createAppointment(request));
+        verify(appointmentRepository, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_should_reject_when_day_is_closed() {
+        UUID clientId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        OffsetDateTime start = OffsetDateTime.parse("2026-05-10T14:00:00Z");
+
+        when(clientService.requireClient(clientId)).thenReturn(new ClientRecord(clientId, "Maria", null, null, null, null, 0, start, start));
+        when(serviceCatalogRepository.findById(serviceId)).thenReturn(Optional.of(activeService(serviceId, start, 60)));
+        when(businessHoursRepository.findByDayOfWeek((short) 7)).thenReturn(Optional.of(new BusinessHourRecord(
+                UUID.randomUUID(),
+                (short) 7,
+                null,
+                null,
+                true
+        )));
+
+        CreateAppointmentRequest request = new CreateAppointmentRequest(
+                clientId,
+                start,
+                List.of(new AppointmentItemRequest(serviceId, false)),
+                "STUDIO",
+                BigDecimal.ZERO,
+                null,
+                null
+        );
+
+        assertThrows(ConflictException.class, () -> appointmentService.createAppointment(request));
+        verify(appointmentRepository, never()).insertAppointment(any());
+    }
+
+    @Test
+    void createAppointment_should_reject_when_schedule_block_overlaps() {
+        UUID clientId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        OffsetDateTime start = OffsetDateTime.parse("2026-05-10T14:00:00Z");
+        LocalDate localDate = start.atZoneSameInstant(ZoneId.of("America/Havana")).toLocalDate();
+
+        when(clientService.requireClient(clientId)).thenReturn(new ClientRecord(clientId, "Maria", null, null, null, null, 0, start, start));
+        when(serviceCatalogRepository.findById(serviceId)).thenReturn(Optional.of(activeService(serviceId, start, 60)));
+        allowBusinessSchedule(start, start.plusMinutes(60), List.of(new ScheduleBlockRecord(
+                UUID.randomUUID(),
+                localDate,
+                LocalTime.of(9, 30),
+                LocalTime.of(10, 30),
+                "Bloqueo",
+                false,
+                start
+        )));
+
+        CreateAppointmentRequest request = new CreateAppointmentRequest(
+                clientId,
+                start,
+                List.of(new AppointmentItemRequest(serviceId, false)),
+                "STUDIO",
+                BigDecimal.ZERO,
+                null,
+                null
+        );
+
+        assertThrows(ConflictException.class, () -> appointmentService.createAppointment(request));
+        verify(appointmentRepository, never()).insertAppointment(any());
+    }
+
+    private void allowBusinessSchedule(OffsetDateTime start, OffsetDateTime end, List<ScheduleBlockRecord> blocks) {
+        var localStart = start.atZoneSameInstant(ZoneId.of("America/Havana")).toLocalDateTime();
+        var localEnd = end.atZoneSameInstant(ZoneId.of("America/Havana")).toLocalDateTime();
+        short dayOfWeek = (short) localStart.toLocalDate().getDayOfWeek().getValue();
+        when(businessHoursRepository.findByDayOfWeek(dayOfWeek)).thenReturn(Optional.of(new BusinessHourRecord(
+                UUID.randomUUID(),
+                dayOfWeek,
+                LocalTime.of(8, 0),
+                LocalTime.of(18, 0),
+                false
+        )));
+        when(scheduleBlockRepository.findBetween(localStart.toLocalDate(), localEnd.toLocalDate())).thenReturn(blocks);
+    }
+
+    private ServiceCatalogItem activeService(UUID serviceId, OffsetDateTime now, int durationMinutes) {
+        return new ServiceCatalogItem(
+                serviceId,
+                "BROWS",
+                "Diseno",
+                "diseno",
+                null,
+                new BigDecimal("300.00"),
+                durationMinutes,
+                false,
+                BigDecimal.ZERO,
+                true,
+                1,
+                now,
+                now
+        );
     }
 }

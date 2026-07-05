@@ -8,6 +8,10 @@ import com.jenislashes.appointment.dto.UpdateAppointmentStatusRequest;
 import com.jenislashes.appointment.model.AppointmentItemRecord;
 import com.jenislashes.appointment.model.AppointmentRecord;
 import com.jenislashes.appointment.repository.AppointmentRepository;
+import com.jenislashes.business.model.BusinessHourRecord;
+import com.jenislashes.business.model.ScheduleBlockRecord;
+import com.jenislashes.business.repository.BusinessHoursRepository;
+import com.jenislashes.business.repository.ScheduleBlockRepository;
 import com.jenislashes.client.model.ClientRecord;
 import com.jenislashes.client.service.ClientService;
 import com.jenislashes.common.exception.BadRequestException;
@@ -19,7 +23,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,19 +39,26 @@ public class AppointmentService {
     private static final List<String> ACTIVE_STATUSES = List.of("CONFIRMED", "COMPLETED");
     private static final List<String> ALL_STATUSES = List.of("CONFIRMED", "COMPLETED", "CANCELLED");
     private static final List<String> ALL_MODES = List.of("STUDIO", "HOME");
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("America/Havana");
 
     private final AppointmentRepository appointmentRepository;
     private final ClientService clientService;
     private final ServiceCatalogRepository serviceCatalogRepository;
+    private final BusinessHoursRepository businessHoursRepository;
+    private final ScheduleBlockRepository scheduleBlockRepository;
 
     public AppointmentService(
             AppointmentRepository appointmentRepository,
             ClientService clientService,
-            ServiceCatalogRepository serviceCatalogRepository
+            ServiceCatalogRepository serviceCatalogRepository,
+            BusinessHoursRepository businessHoursRepository,
+            ScheduleBlockRepository scheduleBlockRepository
     ) {
         this.appointmentRepository = appointmentRepository;
         this.clientService = clientService;
         this.serviceCatalogRepository = serviceCatalogRepository;
+        this.businessHoursRepository = businessHoursRepository;
+        this.scheduleBlockRepository = scheduleBlockRepository;
     }
 
     public List<AppointmentResponse> listAppointments(OffsetDateTime from, OffsetDateTime to) {
@@ -79,6 +93,7 @@ public class AppointmentService {
         int totalDurationMinutes = appointmentItems.stream().mapToInt(AppointmentItemRecord::durationSnapshotMinutes).sum();
         OffsetDateTime scheduledEnd = request.scheduledStart().plusMinutes(totalDurationMinutes);
         if (ACTIVE_STATUSES.contains(existing.status())) {
+            validateScheduleAvailability(request.scheduledStart(), scheduledEnd);
             validateOverlap(request.scheduledStart(), scheduledEnd, existing.id());
         }
 
@@ -146,6 +161,7 @@ public class AppointmentService {
 
         int totalDurationMinutes = appointmentItems.stream().mapToInt(AppointmentItemRecord::durationSnapshotMinutes).sum();
         OffsetDateTime scheduledEnd = request.scheduledStart().plusMinutes(totalDurationMinutes);
+        validateScheduleAvailability(request.scheduledStart(), scheduledEnd);
         validateOverlap(request.scheduledStart(), scheduledEnd, null);
 
         BigDecimal subtotal = appointmentItems.stream()
@@ -222,6 +238,7 @@ public class AppointmentService {
             }
             cancelledAt = now;
         } else {
+            validateScheduleAvailability(existing.scheduledStart(), existing.scheduledEnd());
             validateOverlap(existing.scheduledStart(), existing.scheduledEnd(), existing.id());
         }
 
@@ -279,6 +296,45 @@ public class AppointmentService {
     private void validateOverlap(OffsetDateTime start, OffsetDateTime end, UUID excludedAppointmentId) {
         if (appointmentRepository.existsOverlap(start, end, excludedAppointmentId)) {
             throw new ConflictException("Appointment overlaps with an existing confirmed or completed appointment");
+        }
+    }
+
+    private void validateScheduleAvailability(OffsetDateTime start, OffsetDateTime end) {
+        var localStart = start.atZoneSameInstant(BUSINESS_ZONE).toLocalDateTime();
+        var localEnd = end.atZoneSameInstant(BUSINESS_ZONE).toLocalDateTime();
+        LocalDate appointmentDate = localStart.toLocalDate();
+
+        if (!appointmentDate.equals(localEnd.toLocalDate())) {
+            throw new ConflictException("Appointment cannot cross business days");
+        }
+
+        short dayOfWeek = (short) appointmentDate.getDayOfWeek().getValue();
+        BusinessHourRecord businessHour = businessHoursRepository.findByDayOfWeek(dayOfWeek)
+                .orElseThrow(() -> new ConflictException("Business hours are not configured for this day"));
+
+        LocalTime startTime = localStart.toLocalTime();
+        LocalTime endTime = localEnd.toLocalTime();
+        if (businessHour.isClosed()
+                || businessHour.openTime() == null
+                || businessHour.closeTime() == null
+                || startTime.isBefore(businessHour.openTime())
+                || endTime.isAfter(businessHour.closeTime())) {
+            throw new ConflictException("Appointment is outside business hours");
+        }
+
+        List<ScheduleBlockRecord> blocks = scheduleBlockRepository.findBetween(appointmentDate, appointmentDate);
+        for (ScheduleBlockRecord block : blocks) {
+            if (block.isFullDay()) {
+                throw new ConflictException("Appointment overlaps with a schedule block");
+            }
+
+            if (block.startTime() == null || block.endTime() == null) {
+                throw new ConflictException("Appointment overlaps with a schedule block");
+            }
+
+            if (startTime.isBefore(block.endTime()) && endTime.isAfter(block.startTime())) {
+                throw new ConflictException("Appointment overlaps with a schedule block");
+            }
         }
     }
 

@@ -5,6 +5,7 @@ import com.jenislashes.finance.dto.CategoryBreakdownResponse;
 import com.jenislashes.finance.dto.CategoryEntry;
 import com.jenislashes.finance.dto.DailyFinanceEntry;
 import com.jenislashes.finance.dto.ExpenseResponse;
+import com.jenislashes.finance.dto.FinanceExportEntry;
 import com.jenislashes.finance.dto.FinanceHistoryMonthResponse;
 import com.jenislashes.finance.dto.FinanceHistoryResponse;
 import com.jenislashes.finance.dto.MonthlyFinanceSummaryResponse;
@@ -23,6 +24,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 @Service
 public class FinanceSummaryService {
@@ -146,6 +148,33 @@ public class FinanceSummaryService {
         return new CategoryBreakdownResponse(incomeBreakdown, expenseBreakdown);
     }
 
+    public String exportCsv(LocalDate from, LocalDate to) {
+        if (from.isAfter(to)) {
+            throw new BadRequestException("From date must be before or equal to to date");
+        }
+
+        OffsetDateTime incomeFrom = from.atStartOfDay(DEFAULT_ZONE).toOffsetDateTime().withOffsetSameInstant(ZoneOffset.UTC);
+        OffsetDateTime incomeTo = to.plusDays(1).atStartOfDay(DEFAULT_ZONE).toOffsetDateTime().withOffsetSameInstant(ZoneOffset.UTC);
+
+        List<FinanceExportEntry> incomeRows = financeSummaryRepository.completedAppointmentsForExport(incomeFrom, incomeTo);
+        List<FinanceExportEntry> expenseRows = expenseRepository.findBetween(from, to).stream()
+                .map(expense -> new FinanceExportEntry(
+                        expense.expenseDate(),
+                        "GASTO",
+                        expense.expenseCategoryName() != null ? expense.expenseCategoryName() : "Sin categoria",
+                        expense.description(),
+                        expense.amount()
+                ))
+                .toList();
+
+        StringBuilder csv = new StringBuilder("fecha,tipo,categoria,descripcion,monto\n");
+        Stream.concat(incomeRows.stream(), expenseRows.stream())
+                .sorted(Comparator.comparing(FinanceExportEntry::date).thenComparing(FinanceExportEntry::type))
+                .forEach(entry -> csv.append(toCsvLine(entry)));
+
+        return csv.toString();
+    }
+
     public FinanceHistoryResponse getFinanceHistory(int months) {
         if (months < 1 || months > 24) {
             throw new BadRequestException("Months must be between 1 and 24");
@@ -174,5 +203,23 @@ public class FinanceSummaryService {
                 income,
                 expenses
         );
+    }
+
+    private String toCsvLine(FinanceExportEntry entry) {
+        return String.join(",",
+                entry.date().toString(),
+                escapeCsv(entry.type()),
+                escapeCsv(entry.category()),
+                escapeCsv(entry.description()),
+                entry.amount().toPlainString()
+        ) + "\n";
+    }
+
+    private String escapeCsv(String value) {
+        String safeValue = value == null ? "" : value;
+        if (safeValue.contains(",") || safeValue.contains("\"") || safeValue.contains("\n") || safeValue.contains("\r")) {
+            return "\"" + safeValue.replace("\"", "\"\"") + "\"";
+        }
+        return safeValue;
     }
 }

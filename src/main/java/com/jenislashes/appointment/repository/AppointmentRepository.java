@@ -225,7 +225,7 @@ public class AppointmentRepository {
                 select exists(
                     select 1
                     from appointments
-                    where status in ('CONFIRMED', 'COMPLETED')
+                    where status = 'CONFIRMED'
                       and scheduled_start < ?
                       and scheduled_end > ?
                 """;

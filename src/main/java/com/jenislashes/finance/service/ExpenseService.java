@@ -55,6 +55,37 @@ public class ExpenseService {
         return toResponse(record);
     }
 
+    @Transactional
+    public ExpenseResponse updateExpense(UUID expenseId, CreateExpenseRequest request) {
+        ExpenseRecord existing = expenseRepository.findById(expenseId)
+                .orElseThrow(() -> new NotFoundException("Expense not found"));
+
+        ExpenseCategoryRecord category = null;
+        if (request.expenseCategoryId() != null) {
+            category = expenseCategoryService.requireCategory(request.expenseCategoryId());
+            if (!category.isActive()) {
+                throw new BadRequestException("Inactive expense category cannot be used");
+            }
+        }
+
+        ExpenseRecord updated = new ExpenseRecord(
+                existing.id(),
+                category != null ? category.id() : null,
+                category != null ? category.name() : null,
+                request.expenseDate(),
+                request.description().trim(),
+                request.amount(),
+                normalizeNullable(request.notes()),
+                existing.createdAt()
+        );
+
+        if (expenseRepository.update(updated) == 0) {
+            throw new NotFoundException("Expense not found");
+        }
+
+        return toResponse(updated);
+    }
+
     private ExpenseResponse toResponse(ExpenseRecord record) {
         return new ExpenseResponse(
                 record.id(),

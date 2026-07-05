@@ -1,6 +1,7 @@
 package com.jenislashes.finance.service;
 
 import com.jenislashes.common.exception.BadRequestException;
+import com.jenislashes.common.exception.NotFoundException;
 import com.jenislashes.finance.dto.CreateExpenseRequest;
 import com.jenislashes.finance.model.ExpenseCategoryRecord;
 import com.jenislashes.finance.model.ExpenseRecord;
@@ -16,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -23,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -107,6 +110,101 @@ class ExpenseServiceTest {
                 () -> assertEquals("caja chica", savedRecord.notes()),
                 () -> assertNull(response.expenseCategoryId())
         );
+    }
+
+    @Test
+    void updateExpense_should_update_fields_and_category_snapshot() {
+        UUID expenseId = UUID.randomUUID();
+        UUID oldCategoryId = UUID.randomUUID();
+        UUID newCategoryId = UUID.randomUUID();
+        OffsetDateTime createdAt = OffsetDateTime.parse("2026-05-01T10:00:00Z");
+
+        when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(new ExpenseRecord(
+                expenseId,
+                oldCategoryId,
+                "Insumos",
+                LocalDate.of(2026, 5, 10),
+                "Algodon",
+                new BigDecimal("200.00"),
+                "nota anterior",
+                createdAt
+        )));
+        when(expenseCategoryService.requireCategory(newCategoryId)).thenReturn(
+                new ExpenseCategoryRecord(newCategoryId, "Transporte", true, createdAt)
+        );
+        when(expenseRepository.update(org.mockito.ArgumentMatchers.any(ExpenseRecord.class))).thenReturn(1);
+
+        var response = expenseService.updateExpense(expenseId, new CreateExpenseRequest(
+                newCategoryId,
+                LocalDate.of(2026, 5, 12),
+                "  Taxi  ",
+                new BigDecimal("350.00"),
+                "  ida y vuelta  "
+        ));
+
+        ArgumentCaptor<ExpenseRecord> recordCaptor = ArgumentCaptor.forClass(ExpenseRecord.class);
+        verify(expenseRepository).update(recordCaptor.capture());
+
+        ExpenseRecord updatedRecord = recordCaptor.getValue();
+        assertAll(
+                () -> assertEquals(expenseId, updatedRecord.id()),
+                () -> assertEquals(newCategoryId, updatedRecord.expenseCategoryId()),
+                () -> assertEquals("Transporte", updatedRecord.expenseCategoryName()),
+                () -> assertEquals(LocalDate.of(2026, 5, 12), updatedRecord.expenseDate()),
+                () -> assertEquals("Taxi", updatedRecord.description()),
+                () -> assertEquals(new BigDecimal("350.00"), updatedRecord.amount()),
+                () -> assertEquals("ida y vuelta", updatedRecord.notes()),
+                () -> assertEquals(createdAt, updatedRecord.createdAt()),
+                () -> assertEquals("Transporte", response.expenseCategoryName()),
+                () -> assertEquals("Taxi", response.description())
+        );
+    }
+
+    @Test
+    void updateExpense_should_throw_when_category_is_inactive() {
+        UUID expenseId = UUID.randomUUID();
+        UUID categoryId = UUID.randomUUID();
+        OffsetDateTime createdAt = OffsetDateTime.parse("2026-05-01T10:00:00Z");
+
+        when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(new ExpenseRecord(
+                expenseId,
+                null,
+                null,
+                LocalDate.of(2026, 5, 10),
+                "Compra",
+                new BigDecimal("200.00"),
+                null,
+                createdAt
+        )));
+        when(expenseCategoryService.requireCategory(categoryId)).thenReturn(
+                new ExpenseCategoryRecord(categoryId, "Transporte", false, createdAt)
+        );
+
+        assertThrows(BadRequestException.class, () -> expenseService.updateExpense(expenseId, new CreateExpenseRequest(
+                categoryId,
+                LocalDate.of(2026, 5, 12),
+                "Taxi",
+                new BigDecimal("350.00"),
+                null
+        )));
+
+        verify(expenseRepository, never()).update(org.mockito.ArgumentMatchers.any(ExpenseRecord.class));
+    }
+
+    @Test
+    void updateExpense_should_throw_when_expense_does_not_exist() {
+        UUID expenseId = UUID.randomUUID();
+        when(expenseRepository.findById(expenseId)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class, () -> expenseService.updateExpense(expenseId, new CreateExpenseRequest(
+                null,
+                LocalDate.of(2026, 5, 12),
+                "Taxi",
+                new BigDecimal("350.00"),
+                null
+        )));
+
+        verify(expenseRepository, never()).update(org.mockito.ArgumentMatchers.any(ExpenseRecord.class));
     }
 
     @Test

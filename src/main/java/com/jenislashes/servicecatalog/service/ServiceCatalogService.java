@@ -89,6 +89,18 @@ public class ServiceCatalogService {
         return toResponse(updated);
     }
 
+    @Transactional
+    public void archiveService(UUID serviceId) {
+        ServiceCatalogItem existing = serviceCatalogRepository.findById(serviceId)
+                .orElseThrow(() -> new NotFoundException("Service not found"));
+
+        if (!existing.isActive()) {
+            return;
+        }
+
+        serviceCatalogRepository.updateActive(serviceId, false, OffsetDateTime.now(ZoneOffset.UTC));
+    }
+
     private void validateTouchUp(UpsertServiceRequest request) {
         if (!request.supportsTouchUp() && request.touchUpDiscount().signum() > 0) {
             throw new BadRequestException("Touch-up discount requires supportsTouchUp=true");

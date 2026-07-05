@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -164,5 +165,32 @@ class ServiceCatalogServiceTest {
                 () -> assertEquals(false, updatedItem.isActive()),
                 () -> assertEquals("clasicas", response.slug())
         );
+    }
+
+    @Test
+    void archiveService_should_mark_service_inactive_without_deleting_it() {
+        UUID serviceId = UUID.randomUUID();
+        OffsetDateTime createdAt = OffsetDateTime.parse("2026-05-01T10:00:00Z");
+        ServiceCatalogItem existing = new ServiceCatalogItem(
+                serviceId,
+                "LASHES",
+                "Clasicas",
+                "clasicas",
+                "old",
+                new BigDecimal("3000.00"),
+                150,
+                true,
+                new BigDecimal("500.00"),
+                true,
+                1,
+                createdAt,
+                createdAt
+        );
+        when(serviceCatalogRepository.findById(serviceId)).thenReturn(Optional.of(existing));
+
+        serviceCatalogService.archiveService(serviceId);
+
+        verify(serviceCatalogRepository).updateActive(eq(serviceId), eq(false), org.mockito.ArgumentMatchers.any(OffsetDateTime.class));
+        verify(serviceCatalogRepository, never()).update(org.mockito.ArgumentMatchers.any(ServiceCatalogItem.class));
     }
 }

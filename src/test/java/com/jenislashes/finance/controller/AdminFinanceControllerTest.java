@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.http.converter.StringHttpMessageConverter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -24,6 +25,8 @@ import java.util.List;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,7 +48,10 @@ class AdminFinanceControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(new AdminFinanceController(financeSummaryService))
-                .setMessageConverters(new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter(objectMapper()))
+                .setMessageConverters(
+                        new StringHttpMessageConverter(),
+                        new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter(objectMapper())
+                )
                 .build();
     }
 
@@ -121,5 +127,19 @@ class AdminFinanceControllerTest {
                 .andExpect(jsonPath("$.expenseBreakdown[0].amount").value(700.00))
                 .andExpect(jsonPath("$.expenseBreakdown[1].category").value("Transporte"))
                 .andExpect(jsonPath("$.expenseBreakdown[1].amount").value(200.00));
+    }
+
+    @Test
+    void exportCsv_should_return_downloadable_csv() throws Exception {
+        when(financeSummaryService.exportCsv(LocalDate.of(2026, 5, 1), LocalDate.of(2026, 5, 3)))
+                .thenReturn("fecha,tipo,categoria,descripcion,monto\n2026-05-01,INGRESO,Citas,Cita completada - Maria,3000.00\n");
+
+        mockMvc.perform(get("/api/v1/admin/finance/export.csv")
+                        .queryParam("from", "2026-05-01")
+                        .queryParam("to", "2026-05-03"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", "attachment; filename=\"jeni-finanzas-2026-05-01-2026-05-03.csv\""))
+                .andExpect(content().contentType("text/csv"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("2026-05-01,INGRESO,Citas")));
     }
 }

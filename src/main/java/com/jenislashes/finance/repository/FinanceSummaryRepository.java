@@ -2,6 +2,7 @@ package com.jenislashes.finance.repository;
 
 import com.jenislashes.finance.dto.CategoryEntry;
 import com.jenislashes.finance.dto.DailyFinanceEntry;
+import com.jenislashes.finance.dto.FinanceExportEntry;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -77,6 +78,33 @@ public class FinanceSummaryRepository {
                   and a.completed_at < ?
                 group by s.category
                 order by amount desc
+                """,
+                mapper,
+                from,
+                toExclusive
+        );
+    }
+
+    public List<FinanceExportEntry> completedAppointmentsForExport(OffsetDateTime from, OffsetDateTime toExclusive) {
+        RowMapper<FinanceExportEntry> mapper = (rs, rowNum) -> new FinanceExportEntry(
+                rs.getObject("date", LocalDate.class),
+                "INGRESO",
+                "Citas",
+                rs.getString("description"),
+                rs.getBigDecimal("amount")
+        );
+
+        return jdbcTemplate.query(
+                """
+                select (a.completed_at at time zone 'America/Havana')::date as date,
+                       concat('Cita completada - ', c.full_name) as description,
+                       a.total_amount as amount
+                from appointments a
+                join clients c on c.id = a.client_id
+                where a.status = 'COMPLETED'
+                  and a.completed_at >= ?
+                  and a.completed_at < ?
+                order by a.completed_at asc
                 """,
                 mapper,
                 from,

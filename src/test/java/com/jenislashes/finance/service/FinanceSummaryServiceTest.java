@@ -3,6 +3,7 @@ package com.jenislashes.finance.service;
 import com.jenislashes.common.exception.BadRequestException;
 import com.jenislashes.finance.dto.CategoryEntry;
 import com.jenislashes.finance.dto.DailyFinanceEntry;
+import com.jenislashes.finance.dto.FinanceExportEntry;
 import com.jenislashes.finance.dto.FinanceHistoryResponse;
 import com.jenislashes.finance.dto.MonthlyFinanceSummaryResponse;
 import com.jenislashes.finance.dto.RangeFinanceResponse;
@@ -231,5 +232,32 @@ class FinanceSummaryServiceTest {
                 LocalDate.of(2026, 5, 10),
                 LocalDate.of(2026, 5, 1)
         ));
+    }
+
+    @Test
+    void exportCsv_should_include_completed_income_and_manual_expenses() {
+        LocalDate from = LocalDate.of(2026, 5, 1);
+        LocalDate to = LocalDate.of(2026, 5, 3);
+
+        when(financeSummaryRepository.completedAppointmentsForExport(any(OffsetDateTime.class), any(OffsetDateTime.class)))
+                .thenReturn(List.of(new FinanceExportEntry(
+                        LocalDate.of(2026, 5, 1),
+                        "INGRESO",
+                        "Citas",
+                        "Cita completada - Maria",
+                        new BigDecimal("3000.00")
+                )));
+        when(expenseRepository.findBetween(from, to)).thenReturn(List.of(
+                new ExpenseRecord(UUID.randomUUID(), UUID.randomUUID(), "Insumos",
+                        LocalDate.of(2026, 5, 2), "Pegamento, premium", new BigDecimal("500.00"),
+                        null, OffsetDateTime.parse("2026-05-02T10:00:00Z"))
+        ));
+
+        String csv = financeSummaryService.exportCsv(from, to);
+
+        org.assertj.core.api.Assertions.assertThat(csv)
+                .contains("fecha,tipo,categoria,descripcion,monto")
+                .contains("2026-05-01,INGRESO,Citas,Cita completada - Maria,3000.00")
+                .contains("2026-05-02,GASTO,Insumos,\"Pegamento, premium\",500.00");
     }
 }

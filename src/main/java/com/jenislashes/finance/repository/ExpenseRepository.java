@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -46,6 +47,21 @@ public class ExpenseRepository {
         );
     }
 
+    public Optional<ExpenseRecord> findById(UUID expenseId) {
+        return jdbcTemplate.query(
+                """
+                select e.id, e.expense_category_id, ec.name as expense_category_name, e.expense_date,
+                       e.description, e.amount, e.notes, e.created_at
+                from expenses e
+                left join expense_categories ec on ec.id = e.expense_category_id
+                where e.id = ?
+                limit 1
+                """,
+                rowMapper,
+                expenseId
+        ).stream().findFirst();
+    }
+
     public void insert(ExpenseRecord expenseRecord) {
         jdbcTemplate.update(
                 """
@@ -59,6 +75,26 @@ public class ExpenseRepository {
                 expenseRecord.amount(),
                 expenseRecord.notes(),
                 expenseRecord.createdAt()
+        );
+    }
+
+    public int update(ExpenseRecord expenseRecord) {
+        return jdbcTemplate.update(
+                """
+                update expenses
+                set expense_category_id = ?,
+                    expense_date = ?,
+                    description = ?,
+                    amount = ?,
+                    notes = ?
+                where id = ?
+                """,
+                expenseRecord.expenseCategoryId(),
+                expenseRecord.expenseDate(),
+                expenseRecord.description(),
+                expenseRecord.amount(),
+                expenseRecord.notes(),
+                expenseRecord.id()
         );
     }
 

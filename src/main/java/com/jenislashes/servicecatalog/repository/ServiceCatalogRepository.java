@@ -125,4 +125,13 @@ public class ServiceCatalogRepository {
                 item.id()
         );
     }
+
+    public void updateActive(UUID serviceId, boolean active, OffsetDateTime updatedAt) {
+        jdbcTemplate.update(
+                "update services set is_active = ?, updated_at = ? where id = ?",
+                active,
+                updatedAt,
+                serviceId
+        );
+    }
 }
