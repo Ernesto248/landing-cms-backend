@@ -196,10 +196,10 @@ insert into business_profile (
 ) values (
     '11111111-1111-1111-1111-111111111111',
     'Jeni''s Lashes & Brows',
-    'Especialista en cejas y pestanas en La Habana.',
+    'Especialista en cejas y pestanas en Camaguey.',
     '55902529',
     'Cornelio Porro #172 altos entre 5 y 6 Garrido',
-    'La Habana',
+    'Camaguey',
     'Cuba',
     'CUP',
     'America/Havana',
