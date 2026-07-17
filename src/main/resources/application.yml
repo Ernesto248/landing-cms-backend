@@ -49,7 +49,7 @@ app:
       secret: ${JWT_SECRET:change-me-please-change-me-please-change-me}
       access-token-minutes: ${JWT_ACCESS_TOKEN_MINUTES:15}
     refresh:
-      token-days: ${REFRESH_TOKEN_DAYS:14}
+      token-days: ${REFRESH_TOKEN_DAYS:3650}
       cookie-name: ${REFRESH_COOKIE_NAME:jeni_refresh_token}
       cookie-same-site: ${REFRESH_COOKIE_SAME_SITE:auto}
       cookie-secure: ${REFRESH_COOKIE_SECURE:auto}

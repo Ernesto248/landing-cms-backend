@@ -64,7 +64,7 @@ public class SecurityProperties {
     }
 
     public static class Refresh {
-        private long tokenDays = 14;
+        private long tokenDays = 3650;
         private String cookieName = "jeni_refresh_token";
         private String cookieSameSite = "auto";
         private String cookieSecure = "auto";
