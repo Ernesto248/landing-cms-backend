@@ -27,6 +27,7 @@ spring:
 server:
   port: ${PORT:8080}
   address: 0.0.0.0
+  forward-headers-strategy: framework
 
 management:
   endpoints:
@@ -50,6 +51,8 @@ app:
     refresh:
       token-days: ${REFRESH_TOKEN_DAYS:14}
       cookie-name: ${REFRESH_COOKIE_NAME:jeni_refresh_token}
+      cookie-same-site: ${REFRESH_COOKIE_SAME_SITE:auto}
+      cookie-secure: ${REFRESH_COOKIE_SECURE:auto}
     admin:
       email: ${ADMIN_EMAIL:}
       password: ${ADMIN_PASSWORD:}

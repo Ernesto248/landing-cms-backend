@@ -120,20 +120,24 @@ public class AuthService {
     }
 
     public ResponseCookie buildRefreshCookie(String refreshToken, HttpServletRequest httpServletRequest) {
+        boolean secureCookie = resolveCookieSecure(httpServletRequest);
+
         return ResponseCookie.from(securityProperties.getRefresh().getCookieName(), refreshToken)
                 .httpOnly(true)
-                .secure(isSecureRequest(httpServletRequest))
-                .sameSite("Lax")
+                .secure(secureCookie)
+                .sameSite(resolveCookieSameSite(secureCookie))
                 .path("/api/v1/auth")
                 .maxAge(Duration.ofDays(securityProperties.getRefresh().getTokenDays()))
                 .build();
     }
 
     public ResponseCookie clearRefreshCookie(HttpServletRequest httpServletRequest) {
+        boolean secureCookie = resolveCookieSecure(httpServletRequest);
+
         return ResponseCookie.from(securityProperties.getRefresh().getCookieName(), "")
                 .httpOnly(true)
-                .secure(isSecureRequest(httpServletRequest))
-                .sameSite("Lax")
+                .secure(secureCookie)
+                .sameSite(resolveCookieSameSite(secureCookie))
                 .path("/api/v1/auth")
                 .maxAge(Duration.ZERO)
                 .build();
@@ -214,8 +218,40 @@ public class AuthService {
     }
 
     private boolean isSecureRequest(HttpServletRequest httpServletRequest) {
+        String forwarded = httpServletRequest.getHeader("Forwarded");
+        if (forwarded != null && forwarded.toLowerCase(Locale.ROOT).contains("proto=https")) {
+            return true;
+        }
+
         String forwardedProto = httpServletRequest.getHeader("X-Forwarded-Proto");
-        return httpServletRequest.isSecure() || "https".equalsIgnoreCase(forwardedProto);
+        String forwardedScheme = httpServletRequest.getHeader("X-Forwarded-Scheme");
+        String forwardedSsl = httpServletRequest.getHeader("X-Forwarded-Ssl");
+
+        return httpServletRequest.isSecure()
+                || "https".equalsIgnoreCase(forwardedProto)
+                || "https".equalsIgnoreCase(forwardedScheme)
+                || "on".equalsIgnoreCase(forwardedSsl);
+    }
+
+    private boolean resolveCookieSecure(HttpServletRequest httpServletRequest) {
+        String configuredSecure = securityProperties.getRefresh().getCookieSecure();
+        if ("true".equalsIgnoreCase(configuredSecure)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(configuredSecure)) {
+            return false;
+        }
+
+        return isSecureRequest(httpServletRequest);
+    }
+
+    private String resolveCookieSameSite(boolean secureCookie) {
+        String configuredSameSite = securityProperties.getRefresh().getCookieSameSite();
+        if (configuredSameSite != null && !configuredSameSite.isBlank() && !"auto".equalsIgnoreCase(configuredSameSite)) {
+            return configuredSameSite;
+        }
+
+        return secureCookie ? "None" : "Lax";
     }
 
     private String resolveIpAddress(HttpServletRequest httpServletRequest) {

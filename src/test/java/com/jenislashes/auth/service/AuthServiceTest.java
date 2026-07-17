@@ -179,14 +179,39 @@ class AuthServiceTest {
 
     @Test
     void buildRefreshCookie_should_mark_cookie_as_secure_when_forwarded_proto_is_https() {
-        when(httpServletRequest.getHeader("X-Forwarded-Proto")).thenReturn("https");
+        when(httpServletRequest.getHeader("Forwarded")).thenReturn("for=192.0.2.60;proto=https;host=api.example.com");
 
         String cookie = authService.buildRefreshCookie("refresh-token", httpServletRequest).toString();
 
         assertAll(
                 () -> assertTrue(cookie.contains("HttpOnly")),
                 () -> assertTrue(cookie.contains("Secure")),
+                () -> assertTrue(cookie.contains("SameSite=None")),
                 () -> assertTrue(cookie.contains("jeni_refresh_token=refresh-token"))
+        );
+    }
+
+    @Test
+    void buildRefreshCookie_should_use_lax_cookie_for_local_http_requests() {
+        String cookie = authService.buildRefreshCookie("refresh-token", httpServletRequest).toString();
+
+        assertAll(
+                () -> assertTrue(cookie.contains("HttpOnly")),
+                () -> assertTrue(cookie.contains("SameSite=Lax")),
+                () -> assertTrue(!cookie.contains("Secure"))
+        );
+    }
+
+    @Test
+    void buildRefreshCookie_should_allow_cookie_options_to_be_forced_by_configuration() {
+        securityProperties.getRefresh().setCookieSecure("true");
+        securityProperties.getRefresh().setCookieSameSite("None");
+
+        String cookie = authService.buildRefreshCookie("refresh-token", httpServletRequest).toString();
+
+        assertAll(
+                () -> assertTrue(cookie.contains("Secure")),
+                () -> assertTrue(cookie.contains("SameSite=None"))
         );
     }
 }

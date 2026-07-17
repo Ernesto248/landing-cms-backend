@@ -66,6 +66,8 @@ public class SecurityProperties {
     public static class Refresh {
         private long tokenDays = 14;
         private String cookieName = "jeni_refresh_token";
+        private String cookieSameSite = "auto";
+        private String cookieSecure = "auto";
 
         public long getTokenDays() {
             return tokenDays;
@@ -81,6 +83,22 @@ public class SecurityProperties {
 
         public void setCookieName(String cookieName) {
             this.cookieName = cookieName;
+        }
+
+        public String getCookieSameSite() {
+            return cookieSameSite;
+        }
+
+        public void setCookieSameSite(String cookieSameSite) {
+            this.cookieSameSite = cookieSameSite;
+        }
+
+        public String getCookieSecure() {
+            return cookieSecure;
+        }
+
+        public void setCookieSecure(String cookieSecure) {
+            this.cookieSecure = cookieSecure;
         }
     }
 
