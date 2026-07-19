@@ -3,6 +3,7 @@ package com.jenislashes.content.testimonial.controller;
 import com.jenislashes.content.testimonial.dto.TestimonialResponse;
 import com.jenislashes.content.testimonial.dto.UpsertTestimonialRequest;
 import com.jenislashes.content.testimonial.service.TestimonialService;
+import com.jenislashes.publicapi.PublicCacheService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,9 +23,14 @@ import java.util.UUID;
 public class AdminTestimonialController {
 
     private final TestimonialService testimonialService;
+    private final PublicCacheService publicCacheService;
 
-    public AdminTestimonialController(TestimonialService testimonialService) {
+    public AdminTestimonialController(
+            TestimonialService testimonialService,
+            PublicCacheService publicCacheService
+    ) {
         this.testimonialService = testimonialService;
+        this.publicCacheService = publicCacheService;
     }
 
     @GetMapping
@@ -34,7 +40,9 @@ public class AdminTestimonialController {
 
     @PostMapping
     public ResponseEntity<TestimonialResponse> create(@Valid @RequestBody UpsertTestimonialRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(testimonialService.create(request));
+        TestimonialResponse response = testimonialService.create(request);
+        publicCacheService.evictAll();
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PutMapping("/{testimonialId}")
@@ -42,6 +50,8 @@ public class AdminTestimonialController {
             @PathVariable UUID testimonialId,
             @Valid @RequestBody UpsertTestimonialRequest request
     ) {
-        return ResponseEntity.ok(testimonialService.update(testimonialId, request));
+        TestimonialResponse response = testimonialService.update(testimonialId, request);
+        publicCacheService.evictAll();
+        return ResponseEntity.ok(response);
     }
 }

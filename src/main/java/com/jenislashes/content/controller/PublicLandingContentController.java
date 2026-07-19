@@ -1,7 +1,7 @@
 package com.jenislashes.content.controller;
 
 import com.jenislashes.content.dto.LandingContentResponse;
-import com.jenislashes.content.service.LandingContentService;
+import com.jenislashes.publicapi.PublicCacheService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,14 +13,14 @@ import java.util.List;
 @RequestMapping("/api/v1/public/content")
 public class PublicLandingContentController {
 
-    private final LandingContentService landingContentService;
+    private final PublicCacheService publicCacheService;
 
-    public PublicLandingContentController(LandingContentService landingContentService) {
-        this.landingContentService = landingContentService;
+    public PublicLandingContentController(PublicCacheService publicCacheService) {
+        this.publicCacheService = publicCacheService;
     }
 
     @GetMapping
     public ResponseEntity<List<LandingContentResponse>> list() {
-        return ResponseEntity.ok(landingContentService.listPublic());
+        return ResponseEntity.ok(publicCacheService.content());
     }
 }

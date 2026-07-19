@@ -2,10 +2,7 @@ package com.jenislashes.publicapi;
 
 import com.jenislashes.business.dto.BusinessHourResponse;
 import com.jenislashes.business.dto.BusinessProfileResponse;
-import com.jenislashes.business.service.BusinessHoursService;
-import com.jenislashes.business.service.BusinessProfileService;
 import com.jenislashes.servicecatalog.dto.ServiceResponse;
-import com.jenislashes.servicecatalog.service.ServiceCatalogService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,18 +15,10 @@ import java.util.Map;
 @RequestMapping("/api/v1/public")
 public class PublicController {
 
-    private final ServiceCatalogService serviceCatalogService;
-    private final BusinessProfileService businessProfileService;
-    private final BusinessHoursService businessHoursService;
+    private final PublicCacheService publicCacheService;
 
-    public PublicController(
-            ServiceCatalogService serviceCatalogService,
-            BusinessProfileService businessProfileService,
-            BusinessHoursService businessHoursService
-    ) {
-        this.serviceCatalogService = serviceCatalogService;
-        this.businessProfileService = businessProfileService;
-        this.businessHoursService = businessHoursService;
+    public PublicController(PublicCacheService publicCacheService) {
+        this.publicCacheService = publicCacheService;
     }
 
     @GetMapping("/health-check")
@@ -39,16 +28,16 @@ public class PublicController {
 
     @GetMapping("/services")
     public ResponseEntity<List<ServiceResponse>> services() {
-        return ResponseEntity.ok(serviceCatalogService.getPublicServices());
+        return ResponseEntity.ok(publicCacheService.services());
     }
 
     @GetMapping("/business-profile")
     public ResponseEntity<BusinessProfileResponse> businessProfile() {
-        return ResponseEntity.ok(businessProfileService.getProfile());
+        return ResponseEntity.ok(publicCacheService.businessProfile());
     }
 
     @GetMapping("/business-hours")
     public ResponseEntity<List<BusinessHourResponse>> businessHours() {
-        return ResponseEntity.ok(businessHoursService.listHours());
+        return ResponseEntity.ok(publicCacheService.businessHours());
     }
 }

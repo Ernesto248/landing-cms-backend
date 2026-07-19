@@ -2,6 +2,7 @@ package com.jenislashes.servicecatalog.controller;
 
 import com.jenislashes.servicecatalog.dto.ServiceResponse;
 import com.jenislashes.servicecatalog.dto.UpsertServiceRequest;
+import com.jenislashes.publicapi.PublicCacheService;
 import com.jenislashes.servicecatalog.service.ServiceCatalogService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -23,9 +24,14 @@ import java.util.UUID;
 public class AdminServiceCatalogController {
 
     private final ServiceCatalogService serviceCatalogService;
+    private final PublicCacheService publicCacheService;
 
-    public AdminServiceCatalogController(ServiceCatalogService serviceCatalogService) {
+    public AdminServiceCatalogController(
+            ServiceCatalogService serviceCatalogService,
+            PublicCacheService publicCacheService
+    ) {
         this.serviceCatalogService = serviceCatalogService;
+        this.publicCacheService = publicCacheService;
     }
 
     @GetMapping
@@ -35,7 +41,9 @@ public class AdminServiceCatalogController {
 
     @PostMapping
     public ResponseEntity<ServiceResponse> create(@Valid @RequestBody UpsertServiceRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(serviceCatalogService.createService(request));
+        ServiceResponse response = serviceCatalogService.createService(request);
+        publicCacheService.evictAll();
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PutMapping("/{serviceId}")
@@ -43,12 +51,15 @@ public class AdminServiceCatalogController {
             @PathVariable UUID serviceId,
             @Valid @RequestBody UpsertServiceRequest request
     ) {
-        return ResponseEntity.ok(serviceCatalogService.updateService(serviceId, request));
+        ServiceResponse response = serviceCatalogService.updateService(serviceId, request);
+        publicCacheService.evictAll();
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{serviceId}")
     public ResponseEntity<Void> archive(@PathVariable UUID serviceId) {
         serviceCatalogService.archiveService(serviceId);
+        publicCacheService.evictAll();
         return ResponseEntity.noContent().build();
     }
 }

@@ -1,7 +1,7 @@
 package com.jenislashes.content.testimonial.controller;
 
 import com.jenislashes.content.testimonial.dto.TestimonialResponse;
-import com.jenislashes.content.testimonial.service.TestimonialService;
+import com.jenislashes.publicapi.PublicCacheService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,14 +13,14 @@ import java.util.List;
 @RequestMapping("/api/v1/public/testimonials")
 public class PublicTestimonialController {
 
-    private final TestimonialService testimonialService;
+    private final PublicCacheService publicCacheService;
 
-    public PublicTestimonialController(TestimonialService testimonialService) {
-        this.testimonialService = testimonialService;
+    public PublicTestimonialController(PublicCacheService publicCacheService) {
+        this.publicCacheService = publicCacheService;
     }
 
     @GetMapping
     public ResponseEntity<List<TestimonialResponse>> list() {
-        return ResponseEntity.ok(testimonialService.listPublic());
+        return ResponseEntity.ok(publicCacheService.testimonials());
     }
 }

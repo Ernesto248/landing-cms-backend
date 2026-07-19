@@ -3,6 +3,7 @@ package com.jenislashes.content.controller;
 import com.jenislashes.content.dto.LandingContentResponse;
 import com.jenislashes.content.dto.UpsertLandingContentRequest;
 import com.jenislashes.content.service.LandingContentService;
+import com.jenislashes.publicapi.PublicCacheService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,9 +19,14 @@ import java.util.List;
 public class AdminLandingContentController {
 
     private final LandingContentService landingContentService;
+    private final PublicCacheService publicCacheService;
 
-    public AdminLandingContentController(LandingContentService landingContentService) {
+    public AdminLandingContentController(
+            LandingContentService landingContentService,
+            PublicCacheService publicCacheService
+    ) {
         this.landingContentService = landingContentService;
+        this.publicCacheService = publicCacheService;
     }
 
     @GetMapping
@@ -30,6 +36,8 @@ public class AdminLandingContentController {
 
     @PutMapping
     public ResponseEntity<LandingContentResponse> upsert(@Valid @RequestBody UpsertLandingContentRequest request) {
-        return ResponseEntity.ok(landingContentService.upsert(request));
+        LandingContentResponse response = landingContentService.upsert(request);
+        publicCacheService.evictAll();
+        return ResponseEntity.ok(response);
     }
 }

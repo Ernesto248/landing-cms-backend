@@ -3,6 +3,7 @@ package com.jenislashes.media.controller;
 import com.jenislashes.media.dto.GalleryItemResponse;
 import com.jenislashes.media.dto.UpdateGalleryItemRequest;
 import com.jenislashes.media.service.GalleryService;
+import com.jenislashes.publicapi.PublicCacheService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -26,9 +27,14 @@ import java.util.UUID;
 public class AdminGalleryController {
 
     private final GalleryService galleryService;
+    private final PublicCacheService publicCacheService;
 
-    public AdminGalleryController(GalleryService galleryService) {
+    public AdminGalleryController(
+            GalleryService galleryService,
+            PublicCacheService publicCacheService
+    ) {
         this.galleryService = galleryService;
+        this.publicCacheService = publicCacheService;
     }
 
     @GetMapping
@@ -45,8 +51,9 @@ public class AdminGalleryController {
             @RequestParam(required = false) Boolean isActive,
             @RequestParam(required = false) UUID serviceId
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(galleryService.upload(file, altText, caption, sortOrder, isActive, serviceId));
+        GalleryItemResponse response = galleryService.upload(file, altText, caption, sortOrder, isActive, serviceId);
+        publicCacheService.evictAll();
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PutMapping("/{galleryItemId}")
@@ -54,12 +61,15 @@ public class AdminGalleryController {
             @PathVariable UUID galleryItemId,
             @Valid @org.springframework.web.bind.annotation.RequestBody UpdateGalleryItemRequest request
     ) {
-        return ResponseEntity.ok(galleryService.update(galleryItemId, request));
+        GalleryItemResponse response = galleryService.update(galleryItemId, request);
+        publicCacheService.evictAll();
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{galleryItemId}")
     public ResponseEntity<Void> delete(@PathVariable UUID galleryItemId) {
         galleryService.delete(galleryItemId);
+        publicCacheService.evictAll();
         return ResponseEntity.noContent().build();
     }
 }

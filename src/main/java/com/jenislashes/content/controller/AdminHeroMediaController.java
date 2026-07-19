@@ -6,6 +6,7 @@ import com.jenislashes.content.dto.LandingContentResponse;
 import com.jenislashes.content.dto.UpsertLandingContentRequest;
 import com.jenislashes.content.service.LandingContentService;
 import com.jenislashes.media.service.StorageService;
+import com.jenislashes.publicapi.PublicCacheService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,15 +24,18 @@ public class AdminHeroMediaController {
     private final LandingContentService landingContentService;
     private final StorageService storageService;
     private final ObjectMapper objectMapper;
+    private final PublicCacheService publicCacheService;
 
     public AdminHeroMediaController(
             LandingContentService landingContentService,
             StorageService storageService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            PublicCacheService publicCacheService
     ) {
         this.landingContentService = landingContentService;
         this.storageService = storageService;
         this.objectMapper = objectMapper;
+        this.publicCacheService = publicCacheService;
     }
 
     @PostMapping(path = "/hero-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -56,6 +60,7 @@ public class AdminHeroMediaController {
                 jsonValue
         ));
 
+        publicCacheService.evictAll();
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

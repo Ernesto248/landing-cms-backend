@@ -9,6 +9,7 @@ import com.jenislashes.business.dto.UpsertBusinessHourRequest;
 import com.jenislashes.business.service.BusinessHoursService;
 import com.jenislashes.business.service.BusinessProfileService;
 import com.jenislashes.business.service.ScheduleBlockService;
+import com.jenislashes.publicapi.PublicCacheService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -34,15 +35,18 @@ public class AdminBusinessController {
     private final BusinessProfileService businessProfileService;
     private final BusinessHoursService businessHoursService;
     private final ScheduleBlockService scheduleBlockService;
+    private final PublicCacheService publicCacheService;
 
     public AdminBusinessController(
             BusinessProfileService businessProfileService,
             BusinessHoursService businessHoursService,
-            ScheduleBlockService scheduleBlockService
+            ScheduleBlockService scheduleBlockService,
+            PublicCacheService publicCacheService
     ) {
         this.businessProfileService = businessProfileService;
         this.businessHoursService = businessHoursService;
         this.scheduleBlockService = scheduleBlockService;
+        this.publicCacheService = publicCacheService;
     }
 
     @GetMapping("/profile")
@@ -52,7 +56,9 @@ public class AdminBusinessController {
 
     @PutMapping("/profile")
     public ResponseEntity<BusinessProfileResponse> updateProfile(@Valid @RequestBody UpdateBusinessProfileRequest request) {
-        return ResponseEntity.ok(businessProfileService.updateProfile(request));
+        BusinessProfileResponse response = businessProfileService.updateProfile(request);
+        publicCacheService.evictAll();
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/hours")
@@ -62,7 +68,9 @@ public class AdminBusinessController {
 
     @PutMapping("/hours")
     public ResponseEntity<List<BusinessHourResponse>> upsertHours(@Valid @RequestBody List<@Valid UpsertBusinessHourRequest> requests) {
-        return ResponseEntity.ok(businessHoursService.upsertHours(requests));
+        List<BusinessHourResponse> response = businessHoursService.upsertHours(requests);
+        publicCacheService.evictAll();
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/schedule-blocks")
